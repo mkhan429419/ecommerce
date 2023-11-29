@@ -227,7 +227,17 @@ const forgotPasswordToken=asyncHandler(async(req,res)=> {
 const resetPassword=asyncHandler(async(req, res)=> {
   const {password}=req.body;
   const {token}=req.params;
-  const hashToken=crypto.createHash('sha256').update(token).digest('hex');
+  const hashedToken=crypto.createHash('sha256').update(token).digest('hex');
+  const user=await User.findOne({
+    passwordResetToken: hashedToken,
+    passwordResetExpires: {$gt: Date.now()},
+  })
+  if (!user) throw new Error("Token Expired, please try again later.");
+  user.password=password;
+  user.passwordResetToken=undefined;
+  user.passwordResetToken=undefined;
+  await user.save();
+  res.json(user);
 })
 
-module.exports={createUser, loginUserCtrl, getallUser, getaUser, deleteaUser, updateaUser, blockUser, unblockUser, handleRefreshToken, logout, updatePassword, forgotPasswordToken};
+module.exports={createUser, loginUserCtrl, getallUser, getaUser, deleteaUser, updateaUser, blockUser, unblockUser, handleRefreshToken, logout, updatePassword, forgotPasswordToken, resetPassword};
