@@ -3,6 +3,7 @@ const User=require('../models/userModel');
 const asyncHandler=require("express-async-handler");
 const slugify = require("slugify");
 const validateMongoDbId = require('../utils/validateMongodbId');
+const cloudinaryUploadImg = require('../utils/cloudinary');
 
 const createProduct=asyncHandler(async(req,res)=> {
   try {
@@ -122,7 +123,7 @@ const addToWishlist=asyncHandler(async(req,res)=>{
 
 const rating=asyncHandler(async(req,res)=>{
   const{_id}=req.user;
-  const {star, prodId}=req.body;
+  const {star, prodId, comment}=req.body;
   try {
     const product=await Product.findById(prodId);
   let alreadyRated=product.ratings.find(
@@ -132,7 +133,7 @@ const rating=asyncHandler(async(req,res)=>{
       const updateRating=await Product.updateOne({
         ratings: {$elemMatch: alreadyRated}
       }, {
-        $set:{"ratings.$.star":star}
+        $set:{"ratings.$.star":star, "ratings.$.comment":comment}
       }, {
         new: true,
       }) 
@@ -142,6 +143,7 @@ const rating=asyncHandler(async(req,res)=>{
         $push:{
           ratings: {
             star: star,
+            comment: comment,
             postedby: _id,
           }
         }
@@ -165,4 +167,30 @@ const rating=asyncHandler(async(req,res)=>{
   }
 })
 
-module.exports={createProduct, getaProduct, getAllProduct, updateProduct, deleteProduct, addToWishlist, rating};
+const uploadImages=asyncHandler(async(req,res)=>{
+  const {id}=req.params;
+  validateMongoDbId(id);
+  console.log(req.files);
+  try {
+    const uploader=(path)=>cloudinaryUploadImg(path, 'images');
+    const urls=[];
+    const files=req.files;
+    for (const file of files) {
+      const {path}=file;
+      const newPath=await uploader(path);
+      console.log(newPath);
+      urls.push(newPath);
+    }
+    const findProduct = await Product.findByIdAndUpdate(id, {
+      images: urls.map(file=>{return file;})
+    }, {
+      new: true
+    })
+    res.json(findProduct);
+  }
+  catch(error) {
+    throw new Error(error);
+  }
+})
+
+module.exports={createProduct, getaProduct, getAllProduct, updateProduct, deleteProduct, addToWishlist, rating, uploadImages};
