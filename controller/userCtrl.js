@@ -1,4 +1,7 @@
 const User=require('../models/userModel');
+const Cart = require('../models/cartModel');
+const Product = require('../models/productModel');
+const Coupon = require('../models/couponModel');
 const asyncHandler=require('express-async-handler');
 const { generateToken } = require('../config/jwtToken');
 const validateMongoDbId = require('../utils/validateMongodbId');
@@ -9,8 +12,8 @@ const { sendEmail } = require('./emailCtrl');
 
 const createUser=asyncHandler(async(req,res)=> {
   const email=req.body.email;
-  const findUser=await User.findOne({email:email});
-  if (!findUser) {
+  const findAdmin=await User.findOne({email:email});
+  if (!findAdmin) {
     //Create new user
     const newUser=await User.create(req.body);
     res.json(newUser);
@@ -23,10 +26,10 @@ const createUser=asyncHandler(async(req,res)=> {
 const loginUserCtrl=asyncHandler(async(req,res)=>{
   const {email,password}=req.body;
   // check if user exists or not
-  const findUser=await User.findOne({email});
-  if (findUser && await findUser.isPasswordMatched(password)) {
-    const refreshToken=await generateRefreshToken(findUser?._id);
-    const updateuser=await User.findByIdAndUpdate(findUser.id, {
+  const findAdmin=await User.findOne({email});
+  if (findAdmin && await findAdmin.isPasswordMatched(password)) {
+    const refreshToken=await generateRefreshToken(findAdmin?._id);
+    const updateuser=await User.findByIdAndUpdate(findAdmin.id, {
       refreshToken :refreshToken,
     }, {
       new:true,
@@ -36,12 +39,41 @@ const loginUserCtrl=asyncHandler(async(req,res)=>{
       maxAge:72*60*60*1000,
     });
     res.json({
-      _id: findUser?._id,
-      firstname: findUser?.firstname,
-      lastname: findUser?.lastname,
-      email: findUser?.email,
-      mobile: findUser?.mobile,
-      token:generateToken(findUser?._id),
+      _id: findAdmin?._id,
+      firstname: findAdmin?.firstname,
+      lastname: findAdmin?.lastname,
+      email: findAdmin?.email,
+      mobile: findAdmin?.mobile,
+      token:generateToken(findAdmin?._id),
+    });
+  } else {
+    throw new Error("Invalid Credentials");
+  }
+});
+
+const loginAdmin=asyncHandler(async(req,res)=>{
+  const {email,password}=req.body;
+  // check if user exists or not
+  const findAdmin=await User.findOne({email});
+  if (findAdmin.role!=='admin') throw new errorMonitor("Not Authorised")
+  if (findAdmin && await findAdmin.isPasswordMatched(password)) {
+    const refreshToken=await generateRefreshToken(findAdmin?._id);
+    const updateuser=await User.findByIdAndUpdate(findAdmin.id, {
+      refreshToken :refreshToken,
+    }, {
+      new:true,
+    });
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly:true,
+      maxAge:72*60*60*1000,
+    });
+    res.json({
+      _id: findAdmin?._id,
+      firstname: findAdmin?.firstname,
+      lastname: findAdmin?.lastname,
+      email: findAdmin?.email,
+      mobile: findAdmin?.mobile,
+      token:generateToken(findAdmin?._id),
     });
   } else {
     throw new Error("Invalid Credentials");
@@ -240,4 +272,143 @@ const resetPassword=asyncHandler(async(req, res)=> {
   res.json(user);
 })
 
-module.exports={createUser, loginUserCtrl, getallUser, getaUser, deleteaUser, updateaUser, blockUser, unblockUser, handleRefreshToken, logout, updatePassword, forgotPasswordToken, resetPassword};
+const getWishlist = asyncHandler(async (req, res) => {
+  const { _id } = req.user;
+  try {
+    const findUser = await User.findById(_id).populate("wishlist");
+    res.json(findUser);
+  } catch (error) {
+    throw new Error(error);
+  }
+});
+
+const saveAddress=asyncHandler(async (req,res)=>{
+  const {_id}=req.user;
+  validateMongoDbId(_id);
+  try {
+    const updateUser=await User.findByIdAndUpdate(_id, {
+      address: req?.body?.address,
+    }, {
+      new: true,
+    });
+    res.json(updateUser);
+  }
+  catch(error) {
+    throw new Error(error);
+  }
+})
+
+const userCart = asyncHandler(async (req, res) => {
+  const { cart } = req.body;
+  const { _id } = req.user;
+  validateMongoDbId(_id);
+
+  try {
+    let products = [];
+    const user = await User.findById(_id);
+
+    // Check if user already has a cart
+    const alreadyExistCart = await Cart.findOne({ orderby: user._id });
+
+    if (alreadyExistCart) {
+      // Use deleteOne or findOneAndDelete instead of remove
+      await Cart.deleteOne({ _id: alreadyExistCart._id });
+    }
+
+    for (let i = 0; i < cart.length; i++) {
+      let object = {};
+      object.product = cart[i]._id;
+      object.count = cart[i].count;
+      object.color = cart[i].color;
+      let getPrice = await Product.findById(cart[i]._id).select("price").exec();
+      object.price = getPrice.price;
+      products.push(object);
+    }
+
+    let cartTotal = 0;
+    for (let i = 0; i < products.length; i++) {
+      cartTotal = cartTotal + products[i].price * products[i].count;
+    }
+
+    let newCart = await new Cart({
+      products,
+      cartTotal,
+      orderby: user?._id,
+    }).save();
+
+    res.json(newCart);
+  } catch (error) {
+    throw new Error(error);
+  }
+});
+
+const getUserCart = asyncHandler(async (req, res) => {
+  const { _id } = req.user;
+  validateMongoDbId(_id);
+  try {
+    const cart = await Cart.findOne({ orderby: _id }).populate(
+      "products.product"
+    );
+    res.json(cart);
+  } catch (error) {
+    throw new Error(error);
+  }
+});
+
+const emptyCart = asyncHandler(async (req, res) => {
+  const { _id } = req.user;
+  validateMongoDbId(_id);
+
+  try {
+    const user = await User.findOne({ _id });
+    const cart = await Cart.findOneAndDelete({ orderby: user._id });
+    
+    res.json(cart);
+  } catch (error) {
+    throw new Error(error);
+  }
+});
+
+const applyCoupon = asyncHandler(async (req, res) => {
+  const { coupon } = req.body;
+  const { _id } = req.user;
+  validateMongoDbId(_id);
+
+  const validCoupon = await Coupon.findOne({ name: coupon });
+  if (!validCoupon) {
+    throw new Error("Invalid Coupon");
+  }
+
+  const user = await User.findOne({ _id });
+
+  // Use try-catch block to handle potential null value
+  try {
+    const cartData = await Cart.findOne({ orderby: user._id }).populate("products.product");
+
+    if (!cartData) {
+      throw new Error("Cart not found for the user");
+    }
+
+    const { cartTotal } = cartData;
+
+    if (cartTotal === null || cartTotal === undefined) {
+      throw new Error("Cart total is null or undefined");
+    }
+
+    let totalAfterDiscount = (
+      cartTotal - (cartTotal * validCoupon.discount) / 100
+    ).toFixed(2);
+
+    await Cart.findOneAndUpdate(
+      { orderby: user._id },
+      { totalAfterDiscount },
+      { new: true }
+    );
+
+    res.json(totalAfterDiscount);
+  } catch (error) {
+    throw new Error(error);
+  }
+});
+
+module.exports={createUser, loginUserCtrl, getallUser, getaUser, deleteaUser, updateaUser, blockUser, unblockUser, handleRefreshToken, logout, updatePassword, forgotPasswordToken, resetPassword, loginAdmin, getWishlist, saveAddress, userCart, getUserCart, emptyCart, applyCoupon};
