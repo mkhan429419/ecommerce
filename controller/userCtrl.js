@@ -310,35 +310,53 @@ const userCart = asyncHandler(async (req, res) => {
     const user = await User.findById(_id);
 
     // Check if user already has a cart
-    const alreadyExistCart = await Cart.findOne({ orderby: user._id });
+    let existingCart = await Cart.findOne({ orderby: user._id });
 
-    if (alreadyExistCart) {
-      // Use deleteOne or findOneAndDelete instead of remove
-      await Cart.deleteOne({ _id: alreadyExistCart._id });
+    if (existingCart) {
+      // Update the existing cart with new products
+      for (let i = 0; i < cart.length; i++) {
+        let object = {};
+        object.product = cart[i]._id;
+        object.count = cart[i].count;
+        object.color = cart[i].color;
+        let getPrice = await Product.findById(cart[i]._id).select("price").exec();
+        object.price = getPrice.price;
+        existingCart.products.push(object);
+      }
+
+      // Recalculate cartTotal
+      existingCart.cartTotal = 0;
+      for (let i = 0; i < existingCart.products.length; i++) {
+        existingCart.cartTotal += existingCart.products[i].price * existingCart.products[i].count;
+      }
+
+      // Save the updated cart
+      existingCart = await existingCart.save();
+    } else {
+      // Create a new cart
+      for (let i = 0; i < cart.length; i++) {
+        let object = {};
+        object.product = cart[i]._id;
+        object.count = cart[i].count;
+        object.color = cart[i].color;
+        let getPrice = await Product.findById(cart[i]._id).select("price").exec();
+        object.price = getPrice.price;
+        products.push(object);
+      }
+
+      let cartTotal = 0;
+      for (let i = 0; i < products.length; i++) {
+        cartTotal = cartTotal + products[i].price * products[i].count;
+      }
+
+      let newCart = await new Cart({
+        products,
+        cartTotal,
+        orderby: user?._id,
+      }).save();
     }
 
-    for (let i = 0; i < cart.length; i++) {
-      let object = {};
-      object.product = cart[i]._id;
-      object.count = cart[i].count;
-      object.color = cart[i].color;
-      let getPrice = await Product.findById(cart[i]._id).select("price").exec();
-      object.price = getPrice.price;
-      products.push(object);
-    }
-
-    let cartTotal = 0;
-    for (let i = 0; i < products.length; i++) {
-      cartTotal = cartTotal + products[i].price * products[i].count;
-    }
-
-    let newCart = await new Cart({
-      products,
-      cartTotal,
-      orderby: user?._id,
-    }).save();
-
-    res.json(newCart);
+    res.json({ message: "Cart updated successfully" });
   } catch (error) {
     throw new Error(error);
   }
