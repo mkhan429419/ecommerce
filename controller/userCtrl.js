@@ -535,4 +535,17 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   }
 });
 
-module.exports={createUser, loginUserCtrl, getallUser, getaUser, deleteaUser, updateaUser, blockUser, unblockUser, handleRefreshToken, logout, updatePassword, forgotPasswordToken, resetPassword, loginAdmin, getWishlist, saveAddress, userCart, getUserCart, emptyCart, applyCoupon, createOrder, getOrders, getAllOrders, updateOrderStatus, getOrderByUserId};
+const getMonthWiseOrderIncome=asyncHandler(async(req,res)=>{
+  let monthNames=[ 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December' ];
+  let d=new Date();
+  let endDate='';
+  d.setDate(1)
+  for (let index=0;index<11;index++) {
+    d.setMonth(d.getMonth()-1);
+    endDate=monthNames[d.getMonth()]+" "+d.getFullYear()
+    console.log(endDate)
+  }
+
+})
+
+module.exports={createUser, loginUserCtrl, getallUser, getaUser, deleteaUser, updateaUser, blockUser, unblockUser, handleRefreshToken, logout, updatePassword, forgotPasswordToken, resetPassword, loginAdmin, getWishlist, saveAddress, userCart, getUserCart, emptyCart, applyCoupon, createOrder, getOrders, getAllOrders, updateOrderStatus, getOrderByUserId, getMonthWiseOrderIncome};

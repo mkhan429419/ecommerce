@@ -1,4 +1,4 @@
-const mongoose = require('mongoose'); // Erase if already required
+const mongoose = require("mongoose"); // Erase if already required
 
 // Declare the Schema of the Mongo model
 var orderSchema = new mongoose.Schema(
@@ -13,6 +13,22 @@ var orderSchema = new mongoose.Schema(
         color: String,
       },
     ],
+    paidAt: {
+      type: Date,
+      default:Date.now()
+    },
+    month: {
+      type: String,
+      default: new Date().getMonth()
+    },
+    totalPrice: {
+      type: Number,
+      required: true,
+    },
+    totalPriceAfterDiscount: {
+      type: Number,
+      required: true,
+    },
     paymentIntent: {},
     orderStatus: {
       type: String,
@@ -37,4 +53,4 @@ var orderSchema = new mongoose.Schema(
 );
 
 //Export the model
-module.exports = mongoose.model('Order', orderSchema);
+module.exports = mongoose.model("Order", orderSchema);
