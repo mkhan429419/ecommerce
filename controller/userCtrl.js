@@ -301,64 +301,26 @@ const saveAddress=asyncHandler(async (req,res)=>{
 })
 
 const userCart = asyncHandler(async (req, res) => {
-  const { cart } = req.body;
+  const { productId, color, quantity, price } = req.body;
   const { _id } = req.user;
   validateMongoDbId(_id);
 
   try {
-    let products = [];
-    const user = await User.findById(_id);
+    let newCart = await new Cart({
+      userId: _id,
+      productId,
+      color,
+      quantity,
+      price,
+    }).save();
 
-    // Check if user already has a cart
-    let existingCart = await Cart.findOne({ orderby: user._id });
-
-    if (existingCart) {
-      // Update the existing cart with new products
-      for (let i = 0; i < cart.length; i++) {
-        let object = {};
-        object.product = cart[i]._id;
-        object.count = cart[i].count;
-        object.color = cart[i].color;
-        let getPrice = await Product.findById(cart[i]._id).select("price").exec();
-        object.price = getPrice.price;
-        existingCart.products.push(object);
-      }
-
-      // Recalculate cartTotal
-      existingCart.cartTotal = 0;
-      for (let i = 0; i < existingCart.products.length; i++) {
-        existingCart.cartTotal += existingCart.products[i].price * existingCart.products[i].count;
-      }
-
-      // Save the updated cart
-      existingCart = await existingCart.save();
-    } else {
-      // Create a new cart
-      for (let i = 0; i < cart.length; i++) {
-        let object = {};
-        object.product = cart[i]._id;
-        object.count = cart[i].count;
-        object.color = cart[i].color;
-        let getPrice = await Product.findById(cart[i]._id).select("price").exec();
-        object.price = getPrice.price;
-        products.push(object);
-      }
-
-      let cartTotal = 0;
-      for (let i = 0; i < products.length; i++) {
-        cartTotal = cartTotal + products[i].price * products[i].count;
-      }
-
-      let newCart = await new Cart({
-        products,
-        cartTotal,
-        orderby: user?._id,
-      }).save();
-    }
-
-    res.json({ message: "Cart updated successfully" });
+    // Respond with the newCart object
+    res.json(newCart);
   } catch (error) {
-    throw new Error(error);
+    console.error('Error adding product to cart:', error);
+
+    // Send an error response to the client
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
