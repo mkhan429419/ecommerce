@@ -26,46 +26,34 @@ const createUser=asyncHandler(async(req,res)=> {
 });
 
 const loginUserCtrl = asyncHandler(async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    // check if user exists or not
-    const findUser = await User.findOne({ email });
-
-    if (findUser && (await findUser.isPasswordMatched(password))) {
-      const refreshToken = await generateRefreshToken(findUser?._id);
-      const updatedUser = await User.findByIdAndUpdate(
-        findUser.id,
-        { refreshToken },
-        { new: true }
-      );
-
-      console.log('User:', updatedUser);
-      console.log('Refresh Token:', refreshToken);
-
-      res.cookie('refreshToken', refreshToken, {
-        httpOnly: true,
-        maxAge: 72 * 60 * 60 * 1000,
-      });
-
-      res.json({
-        _id: updatedUser?._id,
-        firstname: updatedUser?.firstname,
-        lastname: updatedUser?.lastname,
-        email: updatedUser?.email,
-        mobile: updatedUser?.mobile,
-        token: generateToken(updatedUser?._id),
-      });
-    } else {
-      throw new Error('Invalid Credentials');
-    }
-  } catch (error) {
-    console.error('Login Error:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+  const { email, password } = req.body;
+  // check if user exists or not
+  const findUser = await User.findOne({ email });
+  if (findUser && (await findUser.isPasswordMatched(password))) {
+    const refreshToken = await generateRefreshToken(findUser?._id);
+    const updateuser = await User.findByIdAndUpdate(
+      findUser.id,
+      {
+        refreshToken: refreshToken,
+      },
+      { new: true }
+    );
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      maxAge: 72 * 60 * 60 * 1000,
+    });
+    res.json({
+      _id: findUser?._id,
+      firstname: findUser?.firstname,
+      lastname: findUser?.lastname,
+      email: findUser?.email,
+      mobile: findUser?.mobile,
+      token: generateToken(findUser?._id),
+    });
+  } else {
+    throw new Error("Invalid Credentials");
   }
 });
-
-
 
 const loginAdmin=asyncHandler(async(req,res)=>{
   const {email,password}=req.body;
@@ -347,6 +335,7 @@ const getUserCart = asyncHandler(async (req, res) => {
   }
 });
 
+
 const emptyCart = asyncHandler(async (req, res) => {
   const { _id } = req.user;
   validateMongoDbId(_id);
@@ -360,7 +349,6 @@ const emptyCart = asyncHandler(async (req, res) => {
     throw new Error(error);
   }
 });
-
 const applyCoupon = asyncHandler(async (req, res) => {
   const { coupon } = req.body;
   const { _id } = req.user;
@@ -520,4 +508,16 @@ const getMonthWiseOrderIncome=asyncHandler(async(req,res)=>{
 
 })
 
-module.exports={createUser, loginUserCtrl, getallUser, getaUser, deleteaUser, updateaUser, blockUser, unblockUser, handleRefreshToken, logout, updatePassword, forgotPasswordToken, resetPassword, loginAdmin, getWishlist, saveAddress, userCart, getUserCart, emptyCart, applyCoupon, createOrder, getOrders, getAllOrders, updateOrderStatus, getOrderByUserId, getMonthWiseOrderIncome};
+const removeProductFromCart=asyncHandler(async(req,res)=>{
+  const { _id } = req.user;
+  const {cartItemId}=req.body;
+  validateMongoDbId(_id);
+  try {
+    const deleteProductFromCart = await Cart.deleteOne({userId:_id,_id:cartItemId})
+    res.json(deleteProductFromCart);
+  } catch (error) {
+    throw new Error(error);
+  }
+})
+
+module.exports={createUser, loginUserCtrl, getallUser, getaUser, deleteaUser, updateaUser, blockUser, unblockUser, handleRefreshToken, logout, updatePassword, forgotPasswordToken, resetPassword, loginAdmin, getWishlist, saveAddress, userCart, getUserCart, emptyCart, applyCoupon, createOrder, getOrders, getAllOrders, updateOrderStatus, getOrderByUserId, getMonthWiseOrderIncome, removeProductFromCart};
