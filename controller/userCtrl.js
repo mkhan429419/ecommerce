@@ -25,33 +25,47 @@ const createUser=asyncHandler(async(req,res)=> {
   }
 });
 
-const loginUserCtrl=asyncHandler(async(req,res)=>{
-  const {email,password}=req.body;
-  // check if user exists or not
-  const findAdmin=await User.findOne({email});
-  if (findAdmin && await findAdmin.isPasswordMatched(password)) {
-    const refreshToken=await generateRefreshToken(findAdmin?._id);
-    const updateuser=await User.findByIdAndUpdate(findAdmin.id, {
-      refreshToken :refreshToken,
-    }, {
-      new:true,
-    });
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly:true,
-      maxAge:72*60*60*1000,
-    });
-    res.json({
-      _id: findAdmin?._id,
-      firstname: findAdmin?.firstname,
-      lastname: findAdmin?.lastname,
-      email: findAdmin?.email,
-      mobile: findAdmin?.mobile,
-      token:generateToken(findAdmin?._id),
-    });
-  } else {
-    throw new Error("Invalid Credentials");
+const loginUserCtrl = asyncHandler(async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // check if user exists or not
+    const findUser = await User.findOne({ email });
+
+    if (findUser && (await findUser.isPasswordMatched(password))) {
+      const refreshToken = await generateRefreshToken(findUser?._id);
+      const updatedUser = await User.findByIdAndUpdate(
+        findUser.id,
+        { refreshToken },
+        { new: true }
+      );
+
+      console.log('User:', updatedUser);
+      console.log('Refresh Token:', refreshToken);
+
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        maxAge: 72 * 60 * 60 * 1000,
+      });
+
+      res.json({
+        _id: updatedUser?._id,
+        firstname: updatedUser?.firstname,
+        lastname: updatedUser?.lastname,
+        email: updatedUser?.email,
+        mobile: updatedUser?.mobile,
+        token: generateToken(updatedUser?._id),
+      });
+    } else {
+      throw new Error('Invalid Credentials');
+    }
+  } catch (error) {
+    console.error('Login Error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
+
+
 
 const loginAdmin=asyncHandler(async(req,res)=>{
   const {email,password}=req.body;
@@ -310,16 +324,12 @@ const userCart = asyncHandler(async (req, res) => {
       userId: _id,
       productId,
       color,
-      quantity,
       price,
+      quantity
     }).save();
-
-    // Respond with the newCart object
     res.json(newCart);
   } catch (error) {
     console.error('Error adding product to cart:', error);
-
-    // Send an error response to the client
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
@@ -328,9 +338,9 @@ const getUserCart = asyncHandler(async (req, res) => {
   const { _id } = req.user;
   validateMongoDbId(_id);
   try {
-    const cart = await Cart.findOne({ orderby: _id }).populate(
-      "products.product"
-    );
+    const cart = await Cart.find({ userId: _id }).populate(
+      "productId"
+    ).populate("color");
     res.json(cart);
   } catch (error) {
     throw new Error(error);
