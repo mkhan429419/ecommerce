@@ -13,7 +13,22 @@ router.put('/password', authMiddleware, updatePassword);
 router.post("/login", loginUserCtrl);
 router.post("/admin-login", loginAdmin);
 router.post("/cart", authMiddleware, userCart);
-router.post("/order/checkout", authMiddleware, checkout);
+router.post("/order/checkout", authMiddleware, async (req, res) => {
+  try {
+    const option = {
+      amount: 5000,
+      currency: "INR",
+    };
+    const order = await instance.orders.create(option);
+    res.json({
+      success: true,
+      order,
+    });
+  } catch (error) {
+    console.error("Error during checkout:", error);
+    res.status(500).json({ success: false, error: "Internal Server Error" });
+  }
+});
 router.post("/order/paymentVerification", authMiddleware, paymentVerification);
 // router.post("/cart/applycoupon", authMiddleware, applyCoupon);
 router.post("/cart/create-order", authMiddleware, createOrder);
