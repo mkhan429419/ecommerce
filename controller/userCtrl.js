@@ -335,22 +335,34 @@ const getUserCart = asyncHandler(async (req, res) => {
   }
 });
 
-const createOrder=asyncHandler(async(req,res)=>{
-  const {shippingInfo,orderItems,totalPrice,totalPriceAfterDiscount,paymentInfo}=req.body;
-  const {_id}=req.user;
+const createOrder = asyncHandler(async (req, res) => {
+  const { shippingInfo, orderItems, totalPrice, totalPriceAfterDiscount } = req.body;
+  const { _id } = req.user;
+  
   try {
-    const order=await Order.create({
-      shippingInfo,orderItems,totalPrice,totalPriceAfterDiscount,paymentInfo,user:_id
-    })
+    // Assume that you have a proper Order model with the necessary fields
+    const order = await Order.create({
+      shippingInfo,
+      orderItems,
+      totalPrice,
+      totalPriceAfterDiscount,
+      user: _id,
+    });
+
+    // You can perform additional logic or validations here if needed
+
     res.json({
       order,
-      success:true
-    })
+      success: true,
+    });
+  } catch (error) {
+    console.error('Error creating order:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+    });
   }
-  catch(error) {
-    throw new Error(error)
-  }
-})
+});
 
 
 // const emptyCart = asyncHandler(async (req, res) => {
@@ -451,45 +463,45 @@ const createOrder=asyncHandler(async(req,res)=>{
 //   }
 // });
 
-// const getOrders = asyncHandler(async (req, res) => {
-//   const { _id } = req.user;
-//   validateMongoDbId(_id);
-//   try {
-//     const userorders = await Order.findOne({ orderby: _id })
-//       .populate("products.product")
-//       .populate("orderby")
-//       .exec();
-//     res.json(userorders);
-//   } catch (error) {
-//     throw new Error(error);
-//   }
-// });
+const getOrders = asyncHandler(async (req, res) => {
+  const { _id } = req.user;
+  validateMongoDbId(_id);
+  try {
+    const userorders = await Order.findOne({ orderby: _id })
+      .populate("products.product")
+      .populate("orderby")
+      .exec();
+    res.json(userorders);
+  } catch (error) {
+    throw new Error(error);
+  }
+});
 
-// const getAllOrders = asyncHandler(async (req, res) => {
-//   try {
-//     const alluserorders = await Order.find()
-//       .populate("products.product")
-//       .populate("orderby")
-//       .exec();
-//     res.json(alluserorders);
-//   } catch (error) {
-//     throw new Error(error);
-//   }
-// });
+const getAllOrders = asyncHandler(async (req, res) => {
+  try {
+    const alluserorders = await Order.find()
+      .populate("products.product")
+      .populate("orderby")
+      .exec();
+    res.json(alluserorders);
+  } catch (error) {
+    throw new Error(error);
+  }
+});
 
-// const getOrderByUserId = asyncHandler(async (req, res) => {
-//   const { id } = req.params;
-//   validateMongoDbId(id);
-//   try {
-//     const userorders = await Order.findOne({ orderby: id })
-//       .populate("products.product")
-//       .populate("orderby")
-//       .exec();
-//     res.json(userorders);
-//   } catch (error) {
-//     throw new Error(error);
-//   }
-// });
+const getOrderByUserId = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  validateMongoDbId(id);
+  try {
+    const userorders = await Order.findOne({ orderby: id })
+      .populate("products.product")
+      .populate("orderby")
+      .exec();
+    res.json(userorders);
+  } catch (error) {
+    throw new Error(error);
+  }
+});
 
 // const updateOrderStatus = asyncHandler(async (req, res) => {
 //   const { status } = req.body;
@@ -512,31 +524,40 @@ const createOrder=asyncHandler(async(req,res)=>{
 //   }
 // });
 
-const getMonthWiseOrderIncome=asyncHandler(async(req,res)=>{
-  let monthNames=[ 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December' ];
-  let d=new Date();
-  let endDate='';
-  d.setDate(1)
-  for (let index=0;index<11;index++) {
-    d.setMonth(d.getMonth()-1);
-    endDate=monthNames[d.getMonth()]+" "+d.getFullYear()
-    console.log(endDate)
+const getMonthWiseOrderIncome = asyncHandler(async (req, res) => {
+  let monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  let d = new Date();
+  let endDate = '';
+  d.setDate(1);
+
+  for (let index = 0; index < 11; index++) {
+    d.setMonth(d.getMonth() - 1);
+    endDate = monthNames[d.getMonth()] + ' ' + d.getFullYear();
   }
 
-})
+  const data = await Order.aggregate([
+    {
+      $match: {
+        createdAt: {
+          $lte: new Date(),
+          $gte: new Date(endDate),
+        },
+      },
+    },
+    {
+      $group: {
+        _id: {
+          month: '$month',
+        },
+        amount: { $sum: '$totalPriceAfterDiscount' }, // Corrected line
+        count: { $sum: 1 },
+      },
+    },
+  ]);
 
-const removeProductFromCart=asyncHandler(async(req,res)=>{
-  const { _id } = req.user;
-  const {cartItemId}=req.params;
-  console.log(cartItemId)
-  validateMongoDbId(_id);
-  try {
-    const deleteProductFromCart = await Cart.deleteOne({userId:_id,_id:cartItemId})
-    res.json(deleteProductFromCart);
-  } catch (error) {
-    throw new Error(error);
-  }
-})
+  console.log('Month Wise Order Income Data:', data);
+  res.json(data);
+});
 
 const updateProductQuantityFromCart=asyncHandler(async(req,res)=>{
   const { _id } = req.user;
@@ -553,4 +574,62 @@ const updateProductQuantityFromCart=asyncHandler(async(req,res)=>{
   }
 })
 
-module.exports={createUser, loginUserCtrl, getallUser, getaUser, deleteaUser, updateaUser, blockUser, unblockUser, handleRefreshToken, logout, updatePassword, forgotPasswordToken, resetPassword, loginAdmin, getWishlist, saveAddress, userCart, getUserCart,  getMonthWiseOrderIncome, removeProductFromCart, updateProductQuantityFromCart, createOrder};
+const getYearlyTotalOrders=asyncHandler(async(req,res)=>{
+  let monthNames=[ 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December' ];
+  let d=new Date();
+  let endDate='';
+  d.setDate(1)
+  for (let index=0;index<11;index++) {
+    d.setMonth(d.getMonth()-1);
+    endDate=monthNames[d.getMonth()]+" "+d.getFullYear()
+  }
+  const data=await Order.aggregate([
+    {
+      $match:{
+        createdAt: {
+          $lte: new Date(),
+          $gte: new Date(endDate)
+        }
+      }
+    }, {
+      $group: {
+        _id: null, count:{$sum:1},
+        amount:{$sum:"$totalPriceAfterDiscount"}
+      }
+    }
+  ])
+  console.log("Yearly Total Orders Data:", data);
+  res.json(data)
+})
+
+const removeProductFromCart=asyncHandler(async(req,res)=>{
+  const { _id } = req.user;
+  const {cartItemId}=req.params;
+  console.log(cartItemId)
+  validateMongoDbId(_id);
+  try {
+    const deleteProductFromCart = await Cart.deleteOne({userId:_id,_id:cartItemId})
+    res.json(deleteProductFromCart);
+  } catch (error) {
+    throw new Error(error);
+  }
+})
+
+const getAdminOrders = async (req, res) => {
+  try {
+    // Fetch all orders
+    const orders = await getAllOrders();
+
+    if (!orders) {
+      return res.status(404).json({ error: "No orders found" });
+    }
+
+    // If orders are found, send them in the response
+    res.status(200).json(orders);
+  } catch (error) {
+    console.error("Error fetching orders:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+module.exports={createUser, loginUserCtrl, getallUser, getaUser, deleteaUser, updateaUser, blockUser, unblockUser, handleRefreshToken, logout, updatePassword, forgotPasswordToken, resetPassword, loginAdmin, getWishlist, saveAddress, userCart, getUserCart,  getMonthWiseOrderIncome, removeProductFromCart, updateProductQuantityFromCart, createOrder, getYearlyTotalOrders, getAllOrders, getOrders, getOrderByUserId};
